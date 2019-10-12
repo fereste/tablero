@@ -2,6 +2,25 @@
 #include <SPI.h>
 #include "mcp_can.h"
 #define BUFSIZE 10
+#define RPM_HIGH 0
+#define RPM_LOW 1
+#define SPEED_HIGH 4
+#define SPEED_LOW 5
+#define COOLANT_TEMPERATURE 0
+#define ENGINE_LIGHT 4
+#define OIL_LIGHT 5
+#define BKLIGHT_NEEDLE_HIGH 0
+#define BKLIGHT_NEEDLE_LOW 1
+#define BKLIGHT_NUMBERS_HIGH 4
+#define BKLIGHT_NUMBERS_LOW 5
+#define BKLIGHT_LCD_HIGH 6
+#define BKLIGHT_LCD_LOW 7
+#define TURNING_SIGNALS 0
+#define WARNING_SOUND 1
+#define FOG_LAMPS 4
+#define DOORS_OPEN 0
+#define HIGHBEAMS 3
+#define HEADLAMPS 7
 
 const int spiCSPin = 10;
 MCP_CAN CAN(spiCSPin);
@@ -18,11 +37,18 @@ uint8_t payload[] = {
     0x00,
     0x00};
 
+byte payload201hs[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+byte payload420hs[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+byte payload2a0ms[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+byte payload2a1ms[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+byte payload265ms[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+byte payload433ms[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
 void setup()
 {
     Serial.begin(115200);
 
-    while (CAN_OK != CAN.begin(CAN_125KBPS, MCP_8MHz))
+    while (CAN_OK != CAN.begin(CAN_500KBPS, MCP_8MHz))
     {
         Serial.println("CAN BUS Init Failed");
         delay(100);
@@ -32,78 +58,20 @@ void setup()
 
 void loop()
 {
-    // byte payload[] = {
-    //     0x00, // RPM (16 bits)
-    //     0xFF, // RPM
-    //     0x00,
-    //     0x00,
-    //     46, // Velocidad * 2.53
-    //     96, // Velocidad * 0.01019
-    //     0x00,
-    //     0x00
-    // };
-    // CAN.sendMsgBuf(0x201, 0, 8, payload);
+    rpm(1950);
+    speed(40);
+    coolantTemperature(90);
+    oilLight(false);
 
-    // byte payload2[] = {
-    //     130, // Temperatura - 40°C. Rango: -40 a 214 (0x00 a 0xFE)
-    //     0x00,
-    //     0x00,
-    //     0x00,
-    //     0x00, // Luz de motor
-    //     0x00, // Luz de aceite
-    //     0x00,
-    //     0x00
-    // };
-    // CAN.sendMsgBuf(0x420, 0, 8, payload2);
+    // High speed CAN bus
+    CAN.sendMsgBuf(0x201, 0, 8, payload201hs);
+    CAN.sendMsgBuf(0x420, 0, 8, payload420hs);
 
-    //0x2a0 iluminación agujas
-    //sendPayload(0x2a0, 0, 0, 0, 0, 0, 0, 0, 0);
-
-    //0x2a1 iluminación numeros
-    //sendPayload(0x2a1, 0, 0, 0, 0, 0, 0, 0, 0);
-
-    // 0x265 iluminacion externa
-    // sendPayload(
-    //     0x265,
-    //     0b01100000, // segundo bit luz derecha, 3er bit luz izquierda
-    //     0b00100000, // tercer bit tulilun
-    //     0x00,
-    //     0x00,
-    //     0b00000110, // 6to bit rompenieblas delantero, 7mo bit rompenieblas trasero
-    //     0x00,
-    //     0x00,
-    //     0x00
-    // );
-
-    // //0x433 luces altas y puerta abierta
-    // sendPayload(
-    //     0x433,
-    //     0b00000010, // 7mo bit, puertas abiertas
-    //     0x00,
-    //     0x00,
-    //     0b01000000, // 2do bit, luces altas
-    //     0x00,
-    //     0x00,
-    //     0x00,
-    //     0b00000001 // 8vo bit, luces delanteras (posición o bajas)
-    // );
-
-    // 0xc34 luces altas y puerta abierta
-    // sendPayload(
-    //     0xc34,
-    //     0xff,
-    //     0xff,
-    //     0xff,
-    //     0xff,
-    //     0xff,
-    //     0xff,
-    //     0xff,
-    //     0xff
-    // );
-
-    //sendFromSerial();
-    // scanBus();
-    // sniffBus();
+    // Mid speed CAN bus
+    // CAN.sendMsgBuf(0x2a0, 0, 8, payload2a0ms);
+    // CAN.sendMsgBuf(0x2a1, 0, 8, payload2a1ms);
+    // CAN.sendMsgBuf(0x265, 0, 8, payload265ms);
+    // CAN.sendMsgBuf(0x433, 0, 8, payload433ms);
 
     delay(16);
 }
@@ -172,4 +140,105 @@ void scanBus()
 
         delay(25);
     }
+}
+
+void rpm(unsigned int rpm)
+{
+    byte b0 = (rpm & 0xFF00) >> 8;
+    byte b1 = rpm & 0xFF;
+    payload201hs[RPM_HIGH] = b0;
+    payload201hs[RPM_LOW] = b1;
+}
+
+void speed(unsigned int speed)
+{
+    byte b0 = speed / (7.6 / 3.0);
+    byte b1 = (speed - b0) / 0.01019;
+    payload201hs[SPEED_HIGH] = b0;
+    payload201hs[SPEED_LOW] = b1;
+}
+
+void coolantTemperature(int temp)
+{
+    payload420hs[COOLANT_TEMPERATURE] = temp + 40;
+}
+
+void engineLight(bool on)
+{
+    if (on)
+        payload420hs[ENGINE_LIGHT] |= 0xFF;
+    else
+        payload420hs[ENGINE_LIGHT] &= 0x00;
+}
+
+void oilLight(bool on)
+{
+    if (on)
+        payload420hs[OIL_LIGHT] |= 0b00010000;
+    else
+        payload420hs[OIL_LIGHT] &= 0b11101111;
+}
+
+void backlightNeedles(unsigned int brightness)
+{
+}
+
+void backlightLcd(unsigned int brightness)
+{
+}
+
+void backlightNumbers(unsigned int brightness)
+{
+}
+
+void turningSignals(bool left, bool right, bool blink)
+{
+}
+
+void frontFogLamp(bool on)
+{
+    if (on)
+        payload265ms[FOG_LAMPS] |= 0b00000100;
+    else
+        payload265ms[FOG_LAMPS] &= 0b11111011;
+}
+
+void rearFogLamp(bool on)
+{
+    if (on)
+        payload265ms[FOG_LAMPS] |= 0b00000010;
+    else
+        payload265ms[FOG_LAMPS] &= 0b11111101;
+}
+
+void lights(bool on)
+{
+    if (on)
+        payload433ms[HEADLAMPS] |= 0b00000001;
+    else
+        payload433ms[HEADLAMPS] &= 0b11111110;
+}
+
+void highbeams(bool on)
+{
+    if (on)
+        payload433ms[HIGHBEAMS] |= 0b01000000;
+    else
+        payload433ms[HIGHBEAMS] &= 0b10111111;
+}
+
+void warningSound(bool on)
+{
+    if (on)
+        payload265ms[WARNING_SOUND] |= 0b00100000;
+    else
+        payload265ms[WARNING_SOUND] &= 0x11011111;
+}
+
+void doorsOpenLight(bool on)
+{
+    if (on)
+        payload433ms[DOORS_OPEN] |= 0b00000010;
+    else
+        payload433ms[DOORS_OPEN] &= 0x11111101;
 }
