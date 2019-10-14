@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include <SPI.h>
 #include "mcp_can.h"
+
 #define BUFSIZE 10
 #define RPM_HIGH 0
 #define RPM_LOW 1
@@ -43,10 +44,12 @@ byte payload2a0ms[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 byte payload2a1ms[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 byte payload265ms[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 byte payload433ms[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+String line;
 
 void setup()
 {
     Serial.begin(115200);
+    Serial.setTimeout(75);
 
     while (CAN_OK != CAN.begin(CAN_500KBPS, MCP_8MHz))
     {
@@ -58,11 +61,21 @@ void setup()
 
 void loop()
 {
-    rpm(1950);
-    speed(40);
-    coolantTemperature(90);
-    oilLight(false);
+    if (Serial.available())
+    {
+        unsigned long a = millis();
 
+        line = Serial.readStringUntil(0);
+        int indexOf = line.indexOf('|');
+        rpm(line.substring(0, indexOf).toInt());
+        
+        line = line.substring(indexOf + 1);
+        indexOf = line.indexOf('|');
+        speed(line.substring(0, indexOf).toInt());
+    
+        Serial.println(millis() - a);
+    }
+    
     // High speed CAN bus
     CAN.sendMsgBuf(0x201, 0, 8, payload201hs);
     CAN.sendMsgBuf(0x420, 0, 8, payload420hs);
@@ -72,8 +85,6 @@ void loop()
     // CAN.sendMsgBuf(0x2a1, 0, 8, payload2a1ms);
     // CAN.sendMsgBuf(0x265, 0, 8, payload265ms);
     // CAN.sendMsgBuf(0x433, 0, 8, payload433ms);
-
-    delay(16);
 }
 
 void sendPayload(unsigned long arbId, byte b0, byte b1, byte b2, byte b3, byte b4, byte b5, byte b6, byte b7)
