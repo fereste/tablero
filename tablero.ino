@@ -125,9 +125,7 @@ void sniffBus()
         unsigned long canId = CAN.getCanId();
 
         Serial.print(canId, HEX);
-        Serial.print("(");
-        Serial.print(len);
-        Serial.print(")   ");
+        Serial.print(" - ");
 
         for (int i = 0; i < len; i++)
         {
@@ -152,6 +150,11 @@ void scanBus()
         delay(25);
     }
 }
+
+
+/*******************************
+ * Payload control
+*******************************/
 
 void rpm(unsigned int rpm)
 {
